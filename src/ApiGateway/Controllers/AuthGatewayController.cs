@@ -1,3 +1,4 @@
+using System.Net.Http.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SharedAuth;
@@ -44,6 +45,26 @@ public class AuthGatewayController : ControllerBase
         return Redirect(url);
     }
 
+    [HttpPost("login")]
+    [AllowAnonymous]
+    public async Task<IActionResult> Login([FromBody] OAuthLoginRequest request)
+    {
+        if (request == null)
+            return BadRequest(new { message = "Request body is required" });
+
+        var idpUrl = _configuration["Services:IdentityProvider"] ?? "http://identity_provider:8090";
+        var client = _httpClientFactory.CreateClient();
+        var response = await client.PostAsJsonAsync($"{idpUrl.TrimEnd('/')}/oauth/login", request);
+
+        var payload = await response.Content.ReadAsStringAsync();
+        return new ContentResult
+        {
+            StatusCode = (int)response.StatusCode,
+            Content = payload,
+            ContentType = "application/json"
+        };
+    }
+
     [HttpGet("callback")]
     [AllowAnonymous]
     public async Task<IActionResult> Callback(
@@ -84,4 +105,15 @@ public class AuthGatewayController : ControllerBase
         var uiRedirect = _configuration["Auth:UiRedirectUrl"] ?? "http://localhost:3000/callback";
         return Redirect($"{uiRedirect}?token={Uri.EscapeDataString(payload)}&state={Uri.EscapeDataString(state ?? "")}");
     }
+}
+
+public sealed class OAuthLoginRequest
+{
+    public string response_type { get; set; } = "code";
+    public string client_id { get; set; } = "";
+    public string redirect_uri { get; set; } = "";
+    public string scope { get; set; } = "openid profile email";
+    public string? state { get; set; }
+    public string username { get; set; } = "";
+    public string password { get; set; } = "";
 }

@@ -67,12 +67,18 @@ public class OAuthController : ControllerBase
     private readonly IdentityDb _db;
     private readonly TokenService _tokenService;
     private readonly IEventPublisher _events;
+    private readonly IConfiguration _configuration;
 
-    public OAuthController(IdentityDb db, TokenService tokenService, IEventPublisher events)
+    public OAuthController(
+        IdentityDb db,
+        TokenService tokenService,
+        IEventPublisher events,
+        IConfiguration configuration)
     {
         _db = db;
         _tokenService = tokenService;
         _events = events;
+        _configuration = configuration;
     }
 
     [HttpGet("authorize")]
@@ -88,73 +94,50 @@ public class OAuthController : ControllerBase
         if (!string.Equals(response_type, "code", StringComparison.OrdinalIgnoreCase))
             return BadRequest(new { error = "unsupported_response_type" });
 
-        var client = await _db.Clients.FirstOrDefaultAsync(c => c.ClientId == client_id);
-        if (client == null || !IsRedirectAllowed(client.RedirectUris, redirect_uri))
+        var client = await ValidateAuthorizeRequest(client_id, redirect_uri);
+        if (client == null)
             return BadRequest(new { error = "invalid_client" });
 
         if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
-        {
-            var query = HttpUtility.ParseQueryString("");
-            query["response_type"] = response_type;
-            query["client_id"] = client_id;
-            query["redirect_uri"] = redirect_uri;
-            query["scope"] = scope;
-            if (!string.IsNullOrWhiteSpace(state))
-                query["state"] = state;
+            return Redirect(BuildUiLoginUrl(response_type, client_id, redirect_uri, scope, state));
 
-            var stateField = string.IsNullOrWhiteSpace(state)
-                ? ""
-                : $"""<input type="hidden" name="state" value="{state}" />""";
-
-            var html = $$"""
-                <!DOCTYPE html>
-                <html lang="ru">
-                <head><meta charset="utf-8"><title>Login</title>
-                <style>
-                  body { font-family: sans-serif; max-width: 420px; margin: 40px auto; }
-                  input { width: 100%; margin: 8px 0; padding: 8px; }
-                  button { padding: 8px 16px; }
-                </style></head>
-                <body>
-                  <h2>Flight Booking Login</h2>
-                  <form method="get" action="/oauth/authorize">
-                    <input type="hidden" name="response_type" value="{{response_type}}" />
-                    <input type="hidden" name="client_id" value="{{client_id}}" />
-                    <input type="hidden" name="redirect_uri" value="{{redirect_uri}}" />
-                    <input type="hidden" name="scope" value="{{scope}}" />
-                    {{stateField}}
-                    <label>Username<input name="username" required /></label>
-                    <label>Password<input name="password" type="password" required /></label>
-                    <button type="submit">Sign in</button>
-                  </form>
-                </body></html>
-                """;
-            return Content(html, "text/html");
-        }
-
-        var user = await _db.Users.FirstOrDefaultAsync(u => u.Username == username);
-        if (user == null || !BCrypt.Net.BCrypt.Verify(password, user.PasswordHash))
+        var redirectUrl = await TryCreateAuthorizationRedirectAsync(
+            client, response_type, client_id, redirect_uri, scope, state, username, password);
+        if (redirectUrl == null)
             return Unauthorized(new { error = "invalid_credentials" });
 
-        var code = Guid.NewGuid().ToString("N");
-        _db.AuthCodes.Add(new AuthCode
-        {
-            Code = code,
-            ClientId = client_id,
-            Username = user.Username,
-            RedirectUri = redirect_uri,
-            Scope = string.IsNullOrWhiteSpace(scope) ? "openid profile email" : scope,
-            ExpiresAt = DateTime.UtcNow.AddMinutes(5)
-        });
-        await _db.SaveChangesAsync();
+        return Redirect(redirectUrl);
+    }
 
-        _events.Publish(new ServiceEvent("identity-provider", "user_login", user.Username, null, DateTime.UtcNow));
+    [HttpPost("login")]
+    public async Task<IActionResult> Login([FromBody] OAuthLoginRequest request)
+    {
+        if (request == null)
+            return BadRequest(new { error = "invalid_request" });
 
-        var redirect = $"{redirect_uri}?code={code}";
-        if (!string.IsNullOrWhiteSpace(state))
-            redirect += $"&state={HttpUtility.UrlEncode(state)}";
+        var client = await ValidateAuthorizeRequest(request.client_id, request.redirect_uri);
+        if (client == null)
+            return BadRequest(new { error = "invalid_client" });
 
-        return Redirect(redirect);
+        if (!string.Equals(request.response_type, "code", StringComparison.OrdinalIgnoreCase))
+            return BadRequest(new { error = "unsupported_response_type" });
+
+        if (string.IsNullOrWhiteSpace(request.username) || string.IsNullOrWhiteSpace(request.password))
+            return BadRequest(new { error = "invalid_request" });
+
+        var redirectUrl = await TryCreateAuthorizationRedirectAsync(
+            client,
+            request.response_type,
+            request.client_id,
+            request.redirect_uri,
+            request.scope,
+            request.state,
+            request.username,
+            request.password);
+        if (redirectUrl == null)
+            return Unauthorized(new { error = "invalid_credentials" });
+
+        return Ok(new { redirectUrl });
     }
 
     [HttpPost("token")]
@@ -196,9 +179,101 @@ public class OAuthController : ControllerBase
         });
     }
 
+    private async Task<OauthClient?> ValidateAuthorizeRequest(string client_id, string redirect_uri)
+    {
+        var client = await _db.Clients.FirstOrDefaultAsync(c => c.ClientId == client_id);
+        if (client == null || !IsRedirectAllowed(client.RedirectUris, redirect_uri))
+            return null;
+
+        return client;
+    }
+
+    private async Task<string?> TryCreateAuthorizationRedirectAsync(
+        OauthClient client,
+        string response_type,
+        string client_id,
+        string redirect_uri,
+        string scope,
+        string? state,
+        string username,
+        string password)
+    {
+        if (!string.Equals(response_type, "code", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        if (!IsRedirectAllowed(client.RedirectUris, redirect_uri))
+            return null;
+
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Username == username);
+        if (user == null || !BCrypt.Net.BCrypt.Verify(password, user.PasswordHash))
+            return null;
+
+        var code = Guid.NewGuid().ToString("N");
+        _db.AuthCodes.Add(new AuthCode
+        {
+            Code = code,
+            ClientId = client_id,
+            Username = user.Username,
+            RedirectUri = redirect_uri,
+            Scope = string.IsNullOrWhiteSpace(scope) ? "openid profile email" : scope,
+            ExpiresAt = DateTime.UtcNow.AddMinutes(5)
+        });
+        await _db.SaveChangesAsync();
+
+        _events.Publish(new ServiceEvent("identity-provider", "user_login", user.Username, null, DateTime.UtcNow));
+
+        var redirect = $"{redirect_uri}?code={code}";
+        if (!string.IsNullOrWhiteSpace(state))
+            redirect += $"&state={HttpUtility.UrlEncode(state)}";
+
+        return redirect;
+    }
+
+    private string BuildUiLoginUrl(
+        string response_type,
+        string client_id,
+        string redirect_uri,
+        string scope,
+        string? state)
+    {
+        var query = HttpUtility.ParseQueryString("");
+        query["response_type"] = response_type;
+        query["client_id"] = client_id;
+        query["redirect_uri"] = redirect_uri;
+        query["scope"] = scope;
+        if (!string.IsNullOrWhiteSpace(state))
+            query["state"] = state;
+
+        return $"{GetUiLoginUrl()}?{query}";
+    }
+
+    private string GetUiLoginUrl()
+    {
+        var loginUrl = _configuration["Auth:UiLoginUrl"];
+        if (!string.IsNullOrWhiteSpace(loginUrl))
+            return loginUrl.TrimEnd('/');
+
+        var redirectUrl = _configuration["Auth:UiRedirectUrl"] ?? "http://localhost:3000/callback";
+        if (redirectUrl.EndsWith("/callback", StringComparison.OrdinalIgnoreCase))
+            return redirectUrl[..^"/callback".Length] + "/login";
+
+        return "http://localhost:3000/login";
+    }
+
     private static bool IsRedirectAllowed(string redirectUris, string redirectUri)
         => redirectUris.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Any(uri => string.Equals(uri, redirectUri, StringComparison.OrdinalIgnoreCase));
+}
+
+public sealed class OAuthLoginRequest
+{
+    public string response_type { get; set; } = "code";
+    public string client_id { get; set; } = "";
+    public string redirect_uri { get; set; } = "";
+    public string scope { get; set; } = "openid profile email";
+    public string? state { get; set; }
+    public string username { get; set; } = "";
+    public string password { get; set; } = "";
 }
 
 public sealed class TokenRequest

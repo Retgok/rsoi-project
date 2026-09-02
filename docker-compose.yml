@@ -55,6 +55,8 @@ services:
       DB_CONN_STR: Host=postgres;Port=5432;Database=identity;Username=program;Password=test
       Auth__Issuer: http://localhost:8090
       Auth__Audience: flight-booking
+      Auth__UiLoginUrl: http://localhost:3000/login
+      Auth__UiRedirectUrl: http://localhost:3000/callback
       Kafka__BootstrapServers: kafka:9092
     ports:
       - "8090:8090"

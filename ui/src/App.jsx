@@ -84,6 +84,94 @@ function Layout({ auth, onLogout, children }) {
   );
 }
 
+function LoginPage() {
+  const navigate = useNavigate();
+  const params = new URLSearchParams(window.location.search);
+  const oauthParams = {
+    response_type: params.get('response_type') || 'code',
+    client_id: params.get('client_id') || '',
+    redirect_uri: params.get('redirect_uri') || '',
+    scope: params.get('scope') || 'openid profile email',
+    state: params.get('state') || undefined
+  };
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!oauthParams.client_id || !oauthParams.redirect_uri)
+      navigate('/');
+  }, [navigate, oauthParams.client_id, oauthParams.redirect_uri]);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setError('');
+
+    try {
+      const response = await fetch(`${API_BASE}/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...oauthParams,
+          username,
+          password
+        })
+      });
+
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setError(
+          body.error === 'invalid_credentials'
+            ? 'Неверный логин или пароль'
+            : body.message || body.error || 'Ошибка входа'
+        );
+        return;
+      }
+
+      if (!body.redirectUrl) {
+        setError('IDP не вернул redirectUrl');
+        return;
+      }
+
+      window.location.href = body.redirectUrl;
+    } catch {
+      setError('Не удалось связаться с сервером авторизации');
+    }
+  }
+
+  if (!oauthParams.client_id || !oauthParams.redirect_uri)
+    return null;
+
+  return (
+    <section className="login-page">
+      <form className="user-form login-form" onSubmit={handleSubmit}>
+        <h2>Вход в Flight Booking</h2>
+        {error && <p className="error">{error}</p>}
+        <label>
+          Логин
+          <input
+            required
+            autoComplete="username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+          />
+        </label>
+        <label>
+          Пароль
+          <input
+            required
+            type="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </label>
+        <button type="submit">Войти</button>
+      </form>
+    </section>
+  );
+}
+
 function CallbackPage({ onAuth }) {
   const navigate = useNavigate();
 
@@ -712,6 +800,7 @@ export default function App() {
   return (
     <Layout auth={auth} onLogout={handleLogout}>
       <Routes>
+        <Route path="/login" element={<LoginPage />} />
         <Route path="/callback" element={<CallbackPage onAuth={handleAuth} />} />
         <Route path="/" element={<FlightsPage auth={auth} />} />
         <Route path="/tickets" element={<TicketsPage auth={auth} />} />

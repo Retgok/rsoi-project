@@ -72,7 +72,15 @@ button {
   cursor: pointer;
 }
 
-.info { color: #6b7280; }
+.login-page {
+  display: flex;
+  justify-content: center;
+  padding-top: 48px;
+}
+
+.login-form {
+  width: min(100%, 420px);
+}
 .error { color: #dc2626; }
 
 .grid {
