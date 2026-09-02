@@ -18,11 +18,9 @@ jobs:
         with:
           dotnet-version: '9.0.x'
 
-      - name: Restore and test
+      - name: Restore
         working-directory: src
-        run: |
-          dotnet restore Microservices.sln
-          dotnet test Tests/Tests.csproj --no-restore
+        run: dotnet restore Microservices.sln
 
       - uses: docker/setup-buildx-action@v3
 
@@ -37,6 +35,10 @@ jobs:
           ./scripts/wait-script.sh
         env:
           WAIT_PORTS: 8080,8070,8060,8050,8090,8040,3000
+
+      - name: Test
+        working-directory: src
+        run: dotnet test Tests/Tests.csproj --no-restore
 
       - name: Stop containers
         if: always()
