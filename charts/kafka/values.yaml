@@ -1,0 +1,17 @@
+name: kafka
+replicaCount: 1
+
+image:
+  repository: apache/kafka
+  tag: "3.8.0"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 9092
+
+resources:
+  requests:
+    memory: 512Mi
+  limits:
+    memory: 1Gi

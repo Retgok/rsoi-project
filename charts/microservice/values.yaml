@@ -1,0 +1,34 @@
+name: app
+image:
+  repository: flight-booking/app
+  tag: latest
+  pullPolicy: Never
+
+replicaCount: 1
+
+service:
+  type: ClusterIP
+  port: 8080
+  targetPort: 8080
+
+ingress:
+  enabled: false
+  className: nginx
+  host: flight.local
+  path: /
+  pathType: Prefix
+  paths: []
+
+env: {}
+
+resources: {}
+
+livenessProbe:
+  enabled: true
+  path: /manage/health
+  port: 8080
+
+readinessProbe:
+  enabled: true
+  path: /manage/health
+  port: 8080

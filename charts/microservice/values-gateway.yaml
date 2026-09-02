@@ -1,0 +1,45 @@
+name: gateway
+image:
+  repository: flight-booking/gateway
+  tag: latest
+  pullPolicy: Never
+
+replicaCount: 1
+
+service:
+  type: ClusterIP
+  port: 8080
+  targetPort: 8080
+
+ingress:
+  enabled: true
+  className: nginx
+  host: flight.local
+  paths:
+    - path: /api
+      pathType: Prefix
+
+env:
+  Services__FlightService: http://flights:8060
+  Services__BonusService: http://bonus:8050
+  Services__TicketService: http://tickets:8070
+  Services__StatisticsService: http://statistics:8040
+  Services__IdentityProvider: http://identity-provider:8090
+  Auth__PublicIdentityProviderUrl: http://flight.local
+  Auth__Issuer: http://flight.local
+  Auth__JwksUrl: http://identity-provider:8090/.well-known/jwks.json
+  Auth__ClientId: flight-ui
+  Auth__ClientSecret: flight-ui-secret
+  Auth__CallbackUrl: http://flight.local/api/v1/callback
+  Auth__UiRedirectUrl: http://flight.local/callback
+  Kafka__BootstrapServers: kafka:9092
+
+livenessProbe:
+  enabled: true
+  path: /manage/health
+  port: 8080
+
+readinessProbe:
+  enabled: true
+  path: /manage/health
+  port: 8080

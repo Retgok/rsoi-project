@@ -1,0 +1,38 @@
+name: identity-provider
+image:
+  repository: flight-booking/identity
+  tag: latest
+  pullPolicy: Never
+
+replicaCount: 1
+
+service:
+  type: ClusterIP
+  port: 8090
+  targetPort: 8090
+
+ingress:
+  enabled: true
+  className: nginx
+  host: flight.local
+  paths:
+    - path: /oauth
+      pathType: Prefix
+    - path: /.well-known
+      pathType: ImplementationSpecific
+
+env:
+  DB_CONN_STR: Host=postgres;Port=5432;Database=identity;Username=program;Password=test
+  Auth__Issuer: http://flight.local
+  Auth__Audience: flight-booking
+  Kafka__BootstrapServers: kafka:9092
+
+livenessProbe:
+  enabled: true
+  path: /manage/health
+  port: 8090
+
+readinessProbe:
+  enabled: true
+  path: /manage/health
+  port: 8090

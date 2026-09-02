@@ -1,0 +1,31 @@
+name: bonus
+image:
+  repository: flight-booking/bonus
+  tag: latest
+  pullPolicy: Never
+
+replicaCount: 1
+
+service:
+  type: ClusterIP
+  port: 8050
+  targetPort: 8050
+
+ingress:
+  enabled: false
+
+env:
+  DB_CONN_STR: Host=postgres;Port=5432;Database=privileges;Username=program;Password=test
+  Auth__Issuer: http://flight.local
+  Auth__JwksUrl: http://identity-provider:8090/.well-known/jwks.json
+  Kafka__BootstrapServers: kafka:9092
+
+livenessProbe:
+  enabled: true
+  path: /manage/health
+  port: 8050
+
+readinessProbe:
+  enabled: true
+  path: /manage/health
+  port: 8050

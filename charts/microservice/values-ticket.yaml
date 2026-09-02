@@ -1,0 +1,31 @@
+name: tickets
+image:
+  repository: flight-booking/ticket
+  tag: latest
+  pullPolicy: Never
+
+replicaCount: 1
+
+service:
+  type: ClusterIP
+  port: 8070
+  targetPort: 8070
+
+ingress:
+  enabled: false
+
+env:
+  DB_CONN_STR: Host=postgres;Port=5432;Database=tickets;Username=program;Password=test
+  Auth__Issuer: http://flight.local
+  Auth__JwksUrl: http://identity-provider:8090/.well-known/jwks.json
+  Kafka__BootstrapServers: kafka:9092
+
+livenessProbe:
+  enabled: true
+  path: /manage/health
+  port: 8070
+
+readinessProbe:
+  enabled: true
+  path: /manage/health
+  port: 8070

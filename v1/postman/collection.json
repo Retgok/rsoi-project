@@ -1,0 +1,1148 @@
+{
+  "info": {
+    "_postman_id": "959e6200-3ca6-4e55-8806-c79c6c311ea7",
+    "name": "[rsoi][v1] Flight Booking (JWT)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "unauthorized",
+      "item": [
+        {
+          "name": "[unauthorized] Flights without token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Unauthorized without token', () => {",
+                  "    pm.response.to.have.status(401);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/flights?page=1&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "flights"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "success",
+      "item": [
+        {
+          "name": "[success] Получить список рейсов",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Получить список рейсов', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    const flightNumber = pm.environment.get('flightNumber');",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.items).to.be.an('array');",
+                  "    const flight = response.items.find(f => f.flightNumber === flightNumber);",
+                  "    pm.expect(flight).to.be.not.undefined;",
+                  "    pm.expect(flight.fromAirport).to.eq('Санкт-Петербург Пулково');",
+                  "    pm.expect(flight.toAirport).to.eq('Москва Шереметьево');",
+                  "    pm.expect(flight.price).to.eq(1500);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/flights?page=1&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "flights"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "[success] Получить информацию о состоянии бонусного счета",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Получить информацию о состоянии бонусного счета', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.balance).to.be.a('number');",
+                  "    pm.expect(response.status).to.be.oneOf(['BRONZE', 'SILVER', 'GOLD']);",
+                  "    pm.environment.set('balance', response.balance);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/privilege",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "privilege"
+              ]
+            }
+          }
+        },
+        {
+          "name": "[success] Покупка билета",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Купить билет', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    const flightNumber = pm.environment.get('flightNumber');",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.ticketUid).to.be.not.empty;",
+                  "    pm.expect(response.flightNumber).to.eq(flightNumber);",
+                  "    pm.expect(response.price).to.eq(1500);",
+                  "    pm.expect(response.paidByMoney).to.eq(1500);",
+                  "    pm.expect(response.paidByBonuses).to.eq(0);",
+                  "    pm.expect(response.status).to.eq('PAID');",
+                  "    pm.expect(response.privilege.balance).to.gte(Number(pm.environment.get('balance')) + 150);",
+                  "    pm.environment.set('ticketUid', response.ticketUid);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tickets",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tickets"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"flightNumber\": \"{{flightNumber}}\",\n    \"price\": 1500,\n    \"paidFromBalance\": false\n}"
+            }
+          }
+        },
+        {
+          "name": "[success] Информация по конкретному билету",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Информация по конкретному билету', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(String(response.ticketUid)).to.eq(String(pm.environment.get('ticketUid')));",
+                  "    pm.expect(response.status).to.eq('PAID');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tickets/{{ticketUid}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tickets",
+                ":ticketUid"
+              ],
+              "variable": [
+                {
+                  "key": "ticketUid",
+                  "value": "{{ticketUid}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "[success] Информация по всем билетам пользователя",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Информация по всем билетам пользователя', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    const ticketUid = pm.environment.get('ticketUid');",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response).to.be.an('array');",
+                  "    pm.expect(response.some(t => String(t.ticketUid) === String(ticketUid))).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tickets",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tickets"
+              ]
+            }
+          }
+        },
+        {
+          "name": "[success] Информация о пользователе",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Информация о пользователе', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.tickets).to.be.an('array');",
+                  "    pm.expect(response.privilege).to.be.an('object');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "[success] Баланс после покупки билета",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Баланс после покупки', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    const before = Number(pm.environment.get('balance'));",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.balance).to.eql(before + 150);",
+                  "    pm.environment.set('balance', response.balance);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/privilege",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "privilege"
+              ]
+            }
+          }
+        },
+        {
+          "name": "[success] История бонусного счета",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('История бонусного счета', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/privilege/history",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "privilege",
+                "history"
+              ]
+            }
+          }
+        },
+        {
+          "name": "[success] Возврат билета",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Билет успешно возвращен', () => {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tickets/{{ticketUid}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tickets",
+                ":ticketUid"
+              ],
+              "variable": [
+                {
+                  "key": "ticketUid",
+                  "value": "{{ticketUid}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "[success] Баланс после возврата билета",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Баланс после возврата', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    const beforePurchase = Number(pm.environment.get('balance')) - 150;",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.balance).to.eql(beforePurchase);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/privilege",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "privilege"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "admin",
+      "item": [
+        {
+          "name": "[admin] Statistics report",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Statistics report for admin', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.totalEvents).to.be.a('number');",
+                  "    pm.expect(response.byService).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/statistics/report",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "statistics",
+                "report"
+              ]
+            }
+          }
+        },
+        {
+          "name": "[admin] Statistics report filtered",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Statistics report with filters', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.totalEvents).to.be.a('number');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/statistics/report?service=api-gateway&action=ticket_purchased",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "statistics",
+                "report"
+              ],
+              "query": [
+                {
+                  "key": "service",
+                  "value": "api-gateway"
+                },
+                {
+                  "key": "action",
+                  "value": "ticket_purchased"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "[admin] List users",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Admin can list users', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response).to.be.an('array');",
+                  "    pm.expect(response.some(u => u.username === 'admin')).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "step1",
+      "description": "Bonus Service stopped",
+      "item": [
+        {
+          "name": "[failover] Получить список рейсов",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Получить список рейсов', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    const flightNumber = pm.environment.get('flightNumber');",
+                  "    const response = pm.response.json();",
+                  "    const flight = response.items.find(f => f.flightNumber === flightNumber);",
+                  "    pm.expect(flight).to.be.not.undefined;",
+                  "    pm.expect(flight.price).to.eq(1500);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/flights?page=1&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "flights"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "[failover] Получить информацию о состоянии бонусного счета",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Bonus Service unavailable', () => {",
+                  "    pm.response.to.have.status(503);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.message).to.eq('Bonus Service unavailable');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/privilege",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "privilege"
+              ]
+            }
+          }
+        },
+        {
+          "name": "[failover] Информация о пользователе",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Информация о пользователе с fallback privilege', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.tickets).to.be.an('array');",
+                  "    pm.expect(response.privilege).to.be.an('object');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "[failover] Покупка билета",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Купить билет при недоступном Bonus', () => {",
+                  "    pm.response.to.have.status(503);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.message).to.eq('Bonus Service unavailable');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tickets",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tickets"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"flightNumber\": \"{{flightNumber}}\",\n    \"price\": 1500,\n    \"paidFromBalance\": false\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "step2",
+      "description": "Bonus Service started",
+      "item": [
+        {
+          "name": "[failover] Получить информацию о состоянии бонусного счета",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Получить информацию о состоянии бонусного счета', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.balance).to.be.a('number');",
+                  "    pm.environment.set('balance', response.balance);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/privilege",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "privilege"
+              ]
+            }
+          }
+        },
+        {
+          "name": "[failover] Покупка билета",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Купить билет', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.ticketUid).to.be.not.empty;",
+                  "    pm.expect(response.status).to.eq('PAID');",
+                  "    pm.environment.set('ticketUid', response.ticketUid);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tickets",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tickets"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"flightNumber\": \"{{flightNumber}}\",\n    \"price\": 1500,\n    \"paidFromBalance\": false\n}"
+            }
+          }
+        },
+        {
+          "name": "[failover] Баланс после покупки",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Баланс после покупки', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    const ticketUid = pm.environment.get('ticketUid');",
+                  "    const balance = Number(pm.environment.get('balance'));",
+                  "    const response = pm.response.json();",
+                  "    const ticket = response.history.find(h => String(h.ticketUid) === String(ticketUid));",
+                  "    pm.expect(ticket).to.be.not.undefined;",
+                  "    pm.expect(response.balance).to.eq(balance + 150);",
+                  "    pm.environment.set('balance', response.balance);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/privilege",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "privilege"
+              ]
+            }
+          }
+        },
+        {
+          "name": "[failover] Информация по конкретному билету",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Информация по конкретному билету', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(String(response.ticketUid)).to.eq(String(pm.environment.get('ticketUid')));",
+                  "    pm.expect(response.status).to.eq('PAID');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tickets/{{ticketUid}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tickets",
+                ":ticketUid"
+              ],
+              "variable": [
+                {
+                  "key": "ticketUid",
+                  "value": "{{ticketUid}}"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "step3",
+      "description": "Bonus Service stopped again",
+      "item": [
+        {
+          "name": "[failover] Получить информацию о состоянии бонусного счета",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Bonus Service unavailable', () => {",
+                  "    pm.response.to.have.status(503);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.message).to.eq('Bonus Service unavailable');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/privilege",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "privilege"
+              ]
+            }
+          }
+        },
+        {
+          "name": "[failover] Возврат билета",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Билет успешно возвращен при недоступном Bonus', () => {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tickets/{{ticketUid}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tickets",
+                ":ticketUid"
+              ],
+              "variable": [
+                {
+                  "key": "ticketUid",
+                  "value": "{{ticketUid}}"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "step4",
+      "description": "Bonus Service started, refund queue drained",
+      "item": [
+        {
+          "name": "[failover] Баланс после отложенного refund",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Баланс после возврата через очередь', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    const ticketUid = pm.environment.get('ticketUid');",
+                  "    const balance = Number(pm.environment.get('balance'));",
+                  "    const response = pm.response.json();",
+                  "    const ticket = response.history.find(h => String(h.ticketUid) === String(ticketUid));",
+                  "    pm.expect(ticket).to.be.not.undefined;",
+                  "    pm.expect(response.balance).to.eq(balance - 150);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/privilege",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "privilege"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

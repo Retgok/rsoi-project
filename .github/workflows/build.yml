@@ -1,0 +1,48 @@
+name: Build Project
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore and test
+        working-directory: src
+        run: |
+          dotnet restore Microservices.sln
+          dotnet test Tests/Tests.csproj --no-restore
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build images
+        timeout-minutes: 20
+        run: docker compose build
+
+      - name: Run containers
+        timeout-minutes: 10
+        run: |
+          docker compose up -d
+          ./scripts/wait-script.sh
+        env:
+          WAIT_PORTS: 8080,8070,8060,8050,8090,8040,3000
+
+      - name: Stop containers
+        if: always()
+        continue-on-error: true
+        run: docker compose down -v

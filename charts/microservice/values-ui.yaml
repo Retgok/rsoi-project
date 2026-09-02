@@ -1,0 +1,32 @@
+name: ui
+image:
+  repository: flight-booking/ui
+  tag: latest
+  pullPolicy: Never
+
+replicaCount: 1
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 80
+
+ingress:
+  enabled: true
+  className: nginx
+  host: flight.local
+  paths:
+    - path: /
+      pathType: Prefix
+
+env: {}
+
+livenessProbe:
+  enabled: false
+  path: /
+  port: 80
+
+readinessProbe:
+  enabled: false
+  path: /
+  port: 80

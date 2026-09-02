@@ -1,0 +1,37 @@
+name: statistics
+image:
+  repository: flight-booking/statistics
+  tag: latest
+  pullPolicy: Never
+
+replicaCount: 1
+
+service:
+  type: ClusterIP
+  port: 8040
+  targetPort: 8040
+
+ingress:
+  enabled: false
+
+env:
+  DB_CONN_STR: Host=postgres;Port=5432;Database=statistics;Username=program;Password=test
+  Auth__Issuer: http://flight.local
+  Auth__JwksUrl: http://identity-provider:8090/.well-known/jwks.json
+  Kafka__BootstrapServers: kafka:9092
+
+livenessProbe:
+  enabled: true
+  path: /manage/health
+  port: 8040
+  initialDelaySeconds: 60
+  periodSeconds: 15
+  failureThreshold: 6
+
+readinessProbe:
+  enabled: true
+  path: /manage/health
+  port: 8040
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  failureThreshold: 6

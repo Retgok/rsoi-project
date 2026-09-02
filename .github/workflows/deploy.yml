@@ -1,0 +1,74 @@
+name: Deploy to Yandex Kubernetes
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: Image tag (empty = commit SHA)
+        required: false
+        default: ''
+
+env:
+  DEPLOY_TARGET: cloud
+  YC_FOLDER_ID: ${{ vars.YC_FOLDER_ID }}
+  YC_CLUSTER_ID: ${{ vars.YC_CLUSTER_ID }}
+  YC_REGISTRY: ${{ vars.YC_REGISTRY }}
+  YC_REGISTRY_NAME: ${{ vars.YC_REGISTRY_NAME }}
+  KUBE_NAMESPACE: ${{ vars.KUBE_NAMESPACE }}
+  YC_POSTGRES_STORAGE_CLASS: ${{ vars.YC_POSTGRES_STORAGE_CLASS }}
+  YC_NODE_SA_ID: ${{ vars.YC_NODE_SA_ID }}
+
+jobs:
+  deploy:
+    name: Deploy
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve image tag
+        run: |
+          if [ -n "${{ github.event.inputs.image_tag }}" ]; then
+            echo "IMAGE_TAG=${{ github.event.inputs.image_tag }}" >> "$GITHUB_ENV"
+          else
+            echo "IMAGE_TAG=${{ github.sha }}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Install Yandex Cloud CLI
+        run: |
+          curl -fsSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash
+          echo "$HOME/yandex-cloud/bin" >> "$GITHUB_PATH"
+
+      - name: Configure Yandex Cloud
+        env:
+          YC_OAUTH_TOKEN: ${{ secrets.YC_OAUTH_TOKEN }}
+        run: |
+          yc config set token "$YC_OAUTH_TOKEN"
+          yc config set folder-id "$YC_FOLDER_ID"
+          yc container registry configure-docker
+
+      - name: Install Helm
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+      - name: Configure kubectl
+        env:
+          YC_OAUTH_TOKEN: ${{ secrets.YC_OAUTH_TOKEN }}
+        run: |
+          yc managed-kubernetes cluster get-credentials "$YC_CLUSTER_ID" --external --force --folder-id "$YC_FOLDER_ID"
+          kubectl get nodes
+
+      - name: Push images to Container Registry
+        run: ./scripts/docker-push.sh
+
+      - name: Helm deploy
+        run: ./scripts/helm-deploy.sh
+
+      - name: Smoke check
+        run: |
+          NS="${KUBE_NAMESPACE:-flight-booking}"
+          IP=$(kubectl -n ingress-nginx get svc ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+          HOST="${IP}.nip.io"
+          kubectl -n "$NS" get pods
+          curl -s -o /dev/null -w '/ -> %{http_code}\n' "http://${HOST}/"
+          curl -s -o /dev/null -w '/api/v1/flights -> %{http_code}\n' "http://${HOST}/api/v1/flights"

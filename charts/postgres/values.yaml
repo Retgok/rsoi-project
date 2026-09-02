@@ -1,0 +1,25 @@
+name: postgres
+replicaCount: 1
+
+image:
+  repository: postgres
+  tag: "15"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 5432
+
+persistence:
+  enabled: true
+  size: 1Gi
+  storageClassName: ""
+
+postgresql:
+  username: postgres
+  password: postgres
+  database: postgres
+
+initConfigMaps:
+  main: postgres-init-main
+  scripts: postgres-init-scripts
