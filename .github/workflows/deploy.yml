@@ -43,9 +43,15 @@ jobs:
 
       - name: Configure Yandex Cloud
         env:
-          YC_OAUTH_TOKEN: ${{ secrets.YC_OAUTH_TOKEN }}
+          YC_SA_JSON: ${{ secrets.YC_SA_JSON_CREDENTIALS }}
         run: |
-          yc config set token "$YC_OAUTH_TOKEN"
+          if [ -z "$YC_SA_JSON" ]; then
+            echo "Secret YC_SA_JSON_CREDENTIALS is not set." >&2
+            echo "Create a service account key in Yandex Cloud and paste the JSON into GitHub Secrets." >&2
+            exit 1
+          fi
+          printf '%s' "$YC_SA_JSON" > /tmp/yc-sa-key.json
+          yc config set service-account-key /tmp/yc-sa-key.json
           yc config set folder-id "$YC_FOLDER_ID"
           yc container registry configure-docker
 
@@ -54,8 +60,6 @@ jobs:
           curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 
       - name: Configure kubectl
-        env:
-          YC_OAUTH_TOKEN: ${{ secrets.YC_OAUTH_TOKEN }}
         run: |
           yc managed-kubernetes cluster get-credentials "$YC_CLUSTER_ID" --external --force --folder-id "$YC_FOLDER_ID"
           kubectl get nodes
