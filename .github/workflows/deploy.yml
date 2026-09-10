@@ -77,4 +77,3 @@ jobs:
           HOST="${IP}.nip.io"
           kubectl -n "$NS" get pods
           curl -s -o /dev/null -w '/ -> %{http_code}\n' "http://${HOST}/"
-          curl -s -o /dev/null -w '/api/v1/flights -> %{http_code}\n' "http://${HOST}/api/v1/flights"
