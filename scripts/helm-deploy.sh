@@ -31,7 +31,7 @@ if [[ -z "$HOST" ]]; then
   EXTERNAL_IP=$(kubectl -n ingress-nginx get svc ingress-nginx-controller \
     -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
   [[ -n "$EXTERNAL_IP" ]] || {
-    echo "ingress NLB IP not found. >&2
+    echo "ingress NLB IP not found." >&2
     exit 1
   }
   HOST="${EXTERNAL_IP}.nip.io"
