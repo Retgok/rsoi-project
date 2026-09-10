@@ -88,18 +88,25 @@ public class TicketsGatewayController : ControllerBase
                 }
             ));
 
-        var result = await _service.PurchaseAsync(username, dto);
-        if (result == null)
-            return StatusCode(503, new ErrorResponse("Bonus Service unavailable"));
+        try
+        {
+            var result = await _service.PurchaseAsync(username, dto);
+            if (result == null)
+                return StatusCode(503, new ErrorResponse("Service unavailable"));
 
-        _events.Publish(new ServiceEvent(
-            "api-gateway",
-            "ticket_purchased",
-            username,
-            dto.FlightNumber,
-            DateTime.UtcNow));
+            _events.Publish(new ServiceEvent(
+                "api-gateway",
+                "ticket_purchased",
+                username,
+                dto.FlightNumber,
+                DateTime.UtcNow));
 
-        return Ok(result);
+            return Ok(result);
+        }
+        catch
+        {
+            return StatusCode(503, new ErrorResponse("Service unavailable"));
+        }
     }
 
     [HttpDelete("{ticketUid:guid}")]

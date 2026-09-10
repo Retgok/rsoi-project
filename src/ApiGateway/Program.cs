@@ -10,29 +10,35 @@ builder.Services.AddAuthForwarding();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddRequestMetrics("api-gateway");
 
+static void ConfigureDownstream(HttpClient client, string url)
+{
+    client.BaseAddress = new Uri(url);
+    client.Timeout = TimeSpan.FromSeconds(5);
+}
+
 builder.Services.AddHttpClient<FlightsClient>(client =>
 {
-    client.BaseAddress = new Uri(builder.Configuration["Services:FlightService"] ?? "http://flight_service:8060");
+    ConfigureDownstream(client, builder.Configuration["Services:FlightService"] ?? "http://flight_service:8060");
 }).AddAuthForwarding();
 
 builder.Services.AddHttpClient<BonusClient>(client =>
 {
-    client.BaseAddress = new Uri(builder.Configuration["Services:BonusService"] ?? "http://bonus_service:8050");
+    ConfigureDownstream(client, builder.Configuration["Services:BonusService"] ?? "http://bonus_service:8050");
 }).AddAuthForwarding();
 
 builder.Services.AddHttpClient<TicketsClient>(client =>
 {
-    client.BaseAddress = new Uri(builder.Configuration["Services:TicketService"] ?? "http://ticket_service:8070");
+    ConfigureDownstream(client, builder.Configuration["Services:TicketService"] ?? "http://ticket_service:8070");
 }).AddAuthForwarding();
 
 builder.Services.AddHttpClient<StatisticsClient>(client =>
 {
-    client.BaseAddress = new Uri(builder.Configuration["Services:StatisticsService"] ?? "http://statistics_service:8040");
+    ConfigureDownstream(client, builder.Configuration["Services:StatisticsService"] ?? "http://statistics_service:8040");
 }).AddAuthForwarding();
 
 builder.Services.AddHttpClient<IdentityClient>(client =>
 {
-    client.BaseAddress = new Uri(builder.Configuration["Services:IdentityProvider"] ?? "http://identity_provider:8090");
+    ConfigureDownstream(client, builder.Configuration["Services:IdentityProvider"] ?? "http://identity_provider:8090");
 }).AddAuthForwarding();
 
 builder.Services.AddHttpClient();

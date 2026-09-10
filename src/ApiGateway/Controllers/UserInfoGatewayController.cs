@@ -28,7 +28,16 @@ public class UserInfoGatewayController : ControllerBase
         if (string.IsNullOrWhiteSpace(username))
             return Unauthorized();
 
-        var tickets = await _tickets.GetAllAsync(username);
+        List<TicketResponse>? tickets;
+        try
+        {
+            tickets = await _tickets.GetAllAsync(username);
+        }
+        catch
+        {
+            return StatusCode(503, new ErrorResponse("Ticket Service unavailable"));
+        }
+
         if (tickets == null)
             return StatusCode(503, new ErrorResponse("Ticket Service unavailable"));
 

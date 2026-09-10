@@ -14,6 +14,7 @@ public class FlightService
     public async Task<PaginationResponse?> GetFlightsAsync(int page, int size)
     {
         return await _breaker.ExecuteAsync(
+            "flights",
             action: () => _client.GetAllAsync(page, size),
             fallback: () => null,
             isCritical: true
@@ -25,6 +26,7 @@ public class FlightService
         string username)
     {
         return await _breaker.ExecuteAsync(
+            "flights",
             action: () => _client.GetByFlightNumberAsync(flightNumber, username),
             fallback: () => new FlightResponse
             {

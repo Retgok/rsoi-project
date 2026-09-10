@@ -24,6 +24,8 @@ public sealed class KafkaConsumerWorker : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        await Task.Yield();
+
         var bootstrap = _configuration["Kafka:BootstrapServers"] ?? "kafka:9092";
         var topic = _configuration["Kafka:Topic"] ?? "service-events";
         var groupId = _configuration["Kafka:GroupId"] ?? "statistics-service";
@@ -43,7 +45,7 @@ public sealed class KafkaConsumerWorker : BackgroundService
         {
             try
             {
-                var result = consumer.Consume(stoppingToken);
+                var result = await Task.Run(() => consumer.Consume(stoppingToken), stoppingToken);
                 if (string.IsNullOrWhiteSpace(result.Message.Value))
                     continue;
 

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -7,22 +8,17 @@ namespace ApiGatewayService;
 public interface ICircuitBreaker
 {
     Task<T?> ExecuteAsync<T>(
+        string dependency,
         Func<Task<T?>> action,
         Func<T?> fallback,
         bool isCritical
     );
 }
-
 public class CircuitBreaker : ICircuitBreaker
 {
     private readonly int _failureThreshold;
     private readonly TimeSpan _openTimeout;
-
-    private int _failures;
-    private DateTime _openedAt;
-    private CircuitState _state = CircuitState.Closed;
-
-    private readonly SemaphoreSlim _lock = new(1, 1);
+    private readonly ConcurrentDictionary<string, DependencyState> _states = new();
 
     public CircuitBreaker(int failureThreshold, TimeSpan openTimeout)
     {
@@ -31,34 +27,51 @@ public class CircuitBreaker : ICircuitBreaker
     }
 
     public async Task<T?> ExecuteAsync<T>(
+        string dependency,
         Func<Task<T?>> action,
         Func<T?> fallback,
         bool isCritical)
     {
-        if (_state == CircuitState.Open)
+        var state = _states.GetOrAdd(dependency, _ => new DependencyState());
+
+        await state.Lock.WaitAsync();
+        var skipCall = false;
+        try
         {
-            if (DateTime.UtcNow - _openedAt < _openTimeout)
+            if (state.Circuit == CircuitState.Open)
             {
-                if (isCritical)
-                    throw new Exception("Critical service unavailable");
-
-                return fallback();
+                if (DateTime.UtcNow - state.OpenedAt < _openTimeout)
+                {
+                    skipCall = true;
+                }
+                else
+                {
+                    state.Circuit = CircuitState.HalfOpen;
+                }
             }
+        }
+        finally
+        {
+            state.Lock.Release();
+        }
 
-            // half-open
-            _state = CircuitState.HalfOpen;
+        if (skipCall)
+        {
+            if (isCritical)
+                throw new Exception($"Critical service unavailable: {dependency}");
+
+            return fallback();
         }
 
         try
         {
             var result = await action();
-
-            await ResetAsync();
+            await ResetAsync(state);
             return result;
         }
         catch
         {
-            await RegisterFailureAsync();
+            await RegisterFailureAsync(state);
 
             if (isCritical)
                 throw;
@@ -67,37 +80,44 @@ public class CircuitBreaker : ICircuitBreaker
         }
     }
 
-    private async Task RegisterFailureAsync()
+    private async Task RegisterFailureAsync(DependencyState state)
     {
-        await _lock.WaitAsync();
+        await state.Lock.WaitAsync();
         try
         {
-            _failures++;
-
-            if (_failures >= _failureThreshold)
+            state.Failures++;
+            if (state.Failures >= _failureThreshold)
             {
-                _state = CircuitState.Open;
-                _openedAt = DateTime.UtcNow;
+                state.Circuit = CircuitState.Open;
+                state.OpenedAt = DateTime.UtcNow;
             }
         }
         finally
         {
-            _lock.Release();
+            state.Lock.Release();
         }
     }
 
-    private async Task ResetAsync()
+    private async Task ResetAsync(DependencyState state)
     {
-        await _lock.WaitAsync();
+        await state.Lock.WaitAsync();
         try
         {
-            _failures = 0;
-            _state = CircuitState.Closed;
+            state.Failures = 0;
+            state.Circuit = CircuitState.Closed;
         }
         finally
         {
-            _lock.Release();
+            state.Lock.Release();
         }
+    }
+
+    private sealed class DependencyState
+    {
+        public SemaphoreSlim Lock { get; } = new(1, 1);
+        public int Failures;
+        public DateTime OpenedAt;
+        public CircuitState Circuit = CircuitState.Closed;
     }
 
     private enum CircuitState

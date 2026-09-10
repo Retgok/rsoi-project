@@ -26,6 +26,7 @@ public class TicketsService
     public async Task<List<TicketResponse>?> GetAllAsync(string username)
     {
         var tickets = await _breaker.ExecuteAsync(
+            "tickets",
             () => _tickets.GetAllByUserAsync(username),
             fallback: () => null,
             isCritical: true
@@ -39,7 +40,12 @@ public class TicketsService
         foreach (var t in tickets)
         {
             var flight = await _breaker.ExecuteAsync(
-                () => _flights.GetByFlightNumberAsync(t.FlightNumber, username),
+                "flights",
+                async () =>
+                {
+                    var f = await _flights.GetByFlightNumberAsync(t.FlightNumber, username);
+                    return f ?? throw new InvalidOperationException("Flight unavailable");
+                },
                 fallback: () => new FlightResponse
                 {
                     FlightNumber = t.FlightNumber,
@@ -71,6 +77,7 @@ public class TicketsService
     public async Task<TicketResponse?> GetByUidAsync(Guid uid, string username)
     {
         var ticket = await _breaker.ExecuteAsync(
+            "tickets",
             () => _tickets.GetByUidAsync(uid, username),
             fallback: () => null,
             isCritical: true
@@ -100,7 +107,12 @@ public class TicketsService
         string username)
     {
         return await _breaker.ExecuteAsync(
-            () => _flights.GetByFlightNumberAsync(flightNumber, username),
+            "flights",
+            async () =>
+            {
+                var f = await _flights.GetByFlightNumberAsync(flightNumber, username);
+                return f ?? throw new InvalidOperationException("Flight unavailable");
+            },
             fallback: () => new FlightResponse
             {
                 FlightNumber = flightNumber,
@@ -118,6 +130,7 @@ public class TicketsService
         TicketPurchaseRequest dto)
     {
         var flight = await _breaker.ExecuteAsync(
+            "flights",
             () => _flights.GetByFlightNumberAsync(dto.FlightNumber, username),
             fallback: () => null,
             isCritical: true
@@ -127,6 +140,7 @@ public class TicketsService
             return null;
 
         var ticket = await _breaker.ExecuteAsync(
+            "tickets",
             () => _tickets.PurchaseAsync(username, dto),
             fallback: () => null,
             isCritical: true
@@ -140,6 +154,7 @@ public class TicketsService
         try
         {
             bonus = await _breaker.ExecuteAsync(
+                "bonus",
                 () => _bonus.ApplyAsync(username, new ApplyBonusRequest
                 {
                     TicketUid = ticket.TicketUid,
@@ -156,6 +171,7 @@ public class TicketsService
         catch (Exception)
         {
             await _breaker.ExecuteAsync(
+                "tickets",
                 () => _tickets.CancelAsync(ticket.TicketUid, username),
                 fallback: () => false,
                 isCritical: false
@@ -165,6 +181,7 @@ public class TicketsService
         }
 
         var privilege = await _breaker.ExecuteAsync(
+            "bonus",
             () => _bonus.GetPrivilegeAsync(username),
             fallback: () => null,
             isCritical: false
@@ -195,6 +212,7 @@ public class TicketsService
     public async Task<bool> CancelAsync(Guid ticketUid, string username, string? authorizationHeader)
     {
         var canceled = await _breaker.ExecuteAsync(
+            "tickets",
             () => _tickets.CancelAsync(ticketUid, username),
             fallback: () => false,
             isCritical: true
@@ -204,6 +222,7 @@ public class TicketsService
             return false;
 
         var refundResult = await _breaker.ExecuteAsync(
+            "bonus",
             () => _bonus.RefundAsync(username, ticketUid),
             fallback: () => RefundResult.Retry,
             isCritical: false

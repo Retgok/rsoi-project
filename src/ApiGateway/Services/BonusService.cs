@@ -14,6 +14,7 @@ public class BonusService
     public async Task<PrivilegeInfoResponse?> GetPrivilegeCriticalAsync(string username)
     {
         return await _breaker.ExecuteAsync(
+            "bonus",
             action: () => _client.GetPrivilegeAsync(username),
             fallback: () => null,
             isCritical: true
@@ -23,6 +24,7 @@ public class BonusService
     public async Task<PrivilegeShortInfo?> GetPrivilegeSafeAsync(string username)
     {
         var full = await _breaker.ExecuteAsync(
+            "bonus",
             action: () => _client.GetPrivilegeAsync(username),
             fallback: () => null,
             isCritical: false
