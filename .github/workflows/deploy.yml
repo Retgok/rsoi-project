@@ -2,8 +2,6 @@ name: Deploy to Yandex Kubernetes
 
 on:
   workflow_dispatch:
-    branches:
-      - main
     inputs:
       image_tag:
         description: Image tag (empty = commit SHA)

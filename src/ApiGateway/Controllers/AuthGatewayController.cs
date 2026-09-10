@@ -24,7 +24,6 @@ public class AuthGatewayController : ControllerBase
         [FromQuery] string? redirect_uri,
         [FromQuery] string? state)
     {
-        // Browser redirect must use a public URL (localhost), not the docker DNS name.
         var idpPublicUrl = _configuration["Auth:PublicIdentityProviderUrl"]
                            ?? _configuration["Services:IdentityProvider"]
                            ?? "http://localhost:8090";
