@@ -335,202 +335,59 @@ function ProfilePage({ auth }) {
 }
 
 function AdminPage({ auth }) {
-  const [tab, setTab] = useState('report');
   const [report, setReport] = useState(null);
-  const [eventsPage, setEventsPage] = useState(null);
   const [error, setError] = useState('');
-  const [service, setService] = useState('');
-  const [action, setAction] = useState('');
-  const [username, setUsername] = useState('');
-  const [query, setQuery] = useState('');
-  const [page, setPage] = useState(1);
-  const [applied, setApplied] = useState({ service: '', action: '', username: '', query: '', page: 1 });
 
   useEffect(() => {
     if (!auth) return;
-    const params = new URLSearchParams();
-    if (applied.service) params.set('service', applied.service);
-    if (applied.action) params.set('action', applied.action);
-    const queryString = params.toString();
-
     setError('');
-    if (tab === 'report') {
-      setReport(null);
-      apiFetch(`/statistics/report${queryString ? `?${queryString}` : ''}`, auth)
-        .then(setReport)
-        .catch((e) => setError(e.message));
-      return;
-    }
-
-    const eventParams = new URLSearchParams(params);
-    if (applied.username) eventParams.set('username', applied.username);
-    if (applied.query) eventParams.set('query', applied.query);
-    eventParams.set('page', String(applied.page || 1));
-    eventParams.set('size', '20');
-    setEventsPage(null);
-    apiFetch(`/statistics/events?${eventParams.toString()}`, auth)
-      .then(setEventsPage)
+    setReport(null);
+    apiFetch('/statistics/report', auth)
+      .then(setReport)
       .catch((e) => setError(e.message));
-  }, [auth, applied, tab]);
-
-  function applyFilters(e) {
-    e.preventDefault();
-    setApplied({
-      service: service.trim(),
-      action: action.trim(),
-      username: username.trim(),
-      query: query.trim(),
-      page: 1
-    });
-    setPage(1);
-  }
+  }, [auth]);
 
   if (error) return <p className="error">{error}</p>;
+  if (!report) return <p className="info">Загрузка отчёта...</p>;
 
   return (
     <section>
       <h2>Отчёт статистики</h2>
-      <div className="tabs">
-        <button type="button" className={tab === 'report' ? 'tab active' : 'tab'} onClick={() => setTab('report')}>
-          Отчёт
-        </button>
-        <button type="button" className={tab === 'events' ? 'tab active' : 'tab'} onClick={() => setTab('events')}>
-          Журнал событий
-        </button>
-      </div>
-
-      <form className="filters" onSubmit={applyFilters}>
-        <label>
-          Сервис
-          <input value={service} onChange={(e) => setService(e.target.value)} placeholder="api-gateway" />
-        </label>
-        <label>
-          Действие
-          <input value={action} onChange={(e) => setAction(e.target.value)} placeholder="ticket_purchased" />
-        </label>
-        {tab === 'events' && (
-          <>
-            <label>
-              Пользователь
-              <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="admin" />
-            </label>
-            <label>
-              Поиск
-              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="текст в details" />
-            </label>
-          </>
-        )}
-        <button type="submit">Применить</button>
-      </form>
-
-      {tab === 'report' && !report && <p className="info">Загрузка отчёта...</p>}
-      {tab === 'report' && report && (
-        <>
-          <p>Всего событий: {report.totalEvents}</p>
-          <div className="grid">
-            <div>
-              <h3>Нагруженность</h3>
-              <p>HTTP-запросов: {report.load?.totalRequests ?? 0}</p>
-              <p>Ошибок 5xx: {report.load?.totalErrors ?? 0}</p>
-              <p>Доля ошибок: {report.load?.errorRatePercent ?? 0}%</p>
-              <h4>События по часам</h4>
-              <ul>{report.load?.eventsByHour?.map((x) => <li key={x.hour}>{x.hour}: {x.count}</li>)}</ul>
-              <h4>Самые активные сервисы</h4>
-              <ul>{report.load?.busiestServices?.map((x) => <li key={x.name}>{x.name}: {x.count}</li>)}</ul>
-            </div>
-            <div>
-              <h3>Производительность</h3>
-              <p>Среднее время HTTP: {report.performance?.avgHttpDurationMs ?? 0} ms</p>
-              <p>Среднее время БД: {report.performance?.avgDbDurationMs ?? 0} ms</p>
-              <p>Макс. HTTP: {report.performance?.maxHttpDurationMs ?? 0} ms</p>
-              <p>Макс. БД: {report.performance?.maxDbDurationMs ?? 0} ms</p>
-              <h4>По сервисам</h4>
-              <ul>{report.performance?.byService?.map((x) => (
-                <li key={x.serviceName}>
-                  {x.serviceName}: {x.requestCount} req, HTTP {x.avgHttpMs} ms, DB {x.avgDbMs} ms
-                </li>
-              ))}</ul>
-            </div>
-            <div>
-              <h3>По действиям</h3>
-              <ul>{report.byAction?.map((x) => <li key={x.name}>{x.name}: {x.count}</li>)}</ul>
-            </div>
-            <div>
-              <h3>По пользователям</h3>
-              <ul>{report.byUser?.map((x) => <li key={x.name}>{x.name}: {x.count}</li>)}</ul>
-            </div>
-          </div>
-          <h3>Последние события</h3>
-          <div className="cards">
-            {report.recentEvents?.map((item, index) => (
-              <article key={`${item.createdAt}-${index}`} className="card">
-                <p>{new Date(item.createdAt).toLocaleString()}</p>
-                <p>{item.serviceName} — {item.action}</p>
-                <p>{item.username || '—'}</p>
-                {item.durationMs != null && <p>HTTP: {item.durationMs} ms</p>}
-                {item.details && <pre className="event-details">{item.details}</pre>}
-              </article>
+      <p>Всего событий: {report.totalEvents}</p>
+      <div className="grid">
+        <div>
+          <h3>События по часам</h3>
+          <ul>
+            {report.load?.eventsByHour?.map((x) => (
+              <li key={x.hour}>{x.hour}: {x.count}</li>
             ))}
-          </div>
-        </>
-      )}
-
-      {tab === 'events' && !eventsPage && <p className="info">Загрузка журнала...</p>}
-      {tab === 'events' && eventsPage && (
-        <>
-          <p>
-            Событий: {eventsPage.totalElements}; страница {eventsPage.page} из {Math.max(eventsPage.totalPages, 1)}
-          </p>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Время</th>
-                  <th>Сервис</th>
-                  <th>Действие</th>
-                  <th>Пользователь</th>
-                  <th>Детали</th>
-                </tr>
-              </thead>
-              <tbody>
-                {eventsPage.items?.map((item, index) => (
-                  <tr key={`${item.createdAt}-${index}`}>
-                    <td>{new Date(item.createdAt).toLocaleString()}</td>
-                    <td>{item.serviceName}</td>
-                    <td>{item.action}</td>
-                    <td>{item.username || '—'}</td>
-                    <td><pre className="event-details">{item.details || '—'}</pre></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="pager">
-            <button
-              type="button"
-              disabled={page <= 1}
-              onClick={() => {
-                const next = page - 1;
-                setPage(next);
-                setApplied((prev) => ({ ...prev, page: next }));
-              }}
-            >
-              Назад
-            </button>
-            <button
-              type="button"
-              disabled={page >= (eventsPage.totalPages || 1)}
-              onClick={() => {
-                const next = page + 1;
-                setPage(next);
-                setApplied((prev) => ({ ...prev, page: next }));
-              }}
-            >
-              Вперёд
-            </button>
-          </div>
-        </>
-      )}
+          </ul>
+        </div>
+        <div>
+          <h3>По пользователям</h3>
+          <ul>
+            {report.byUser?.map((x) => (
+              <li key={x.name}>{x.name}: {x.count}</li>
+            ))}
+          </ul>
+        </div>
+        <div>
+          <h3>По действиям</h3>
+          <ul>
+            {report.byAction?.map((x) => (
+              <li key={x.name}>{x.name}: {x.count}</li>
+            ))}
+          </ul>
+        </div>
+        <div>
+          <h3>По сервисам</h3>
+          <ul>
+            {report.byService?.map((x) => (
+              <li key={x.name}>{x.name}: {x.count}</li>
+            ))}
+          </ul>
+        </div>
+      </div>
     </section>
   );
 }
