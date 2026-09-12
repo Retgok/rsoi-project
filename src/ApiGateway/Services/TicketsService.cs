@@ -139,16 +139,6 @@ public class TicketsService
         if (flight == null)
             return PurchaseResult.Unavailable();
 
-        var ticket = await _breaker.ExecuteAsync(
-            "tickets",
-            () => _tickets.PurchaseAsync(username, dto),
-            fallback: () => null,
-            isCritical: true
-        );
-
-        if (ticket == null)
-            return PurchaseResult.Unavailable();
-
         var incremented = await _breaker.ExecuteAsync(
             "flights",
             async () => await _flights.TryIncrementBoughtAsync(dto.FlightNumber),
@@ -160,6 +150,19 @@ public class TicketsService
             return PurchaseResult.Unavailable();
         if (incremented == false)
             return PurchaseResult.SoldOut();
+
+        var ticket = await _breaker.ExecuteAsync(
+            "tickets",
+            () => _tickets.PurchaseAsync(username, dto),
+            fallback: () => null,
+            isCritical: true
+        );
+
+        if (ticket == null)
+        {
+            await _flights.DecrementBoughtAsync(dto.FlightNumber);
+            return PurchaseResult.Unavailable();
+        }
 
         ApplyBonusResponse? bonus = null;
 
