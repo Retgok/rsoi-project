@@ -34,6 +34,24 @@ public class FlightRepo : IFlightRepo
         return (await GetByFlightNumberAsync(flight.FlightNumber))!;
     }
 
+    public async Task<bool> TryIncrementBoughtAsync(string flightNumber)
+    {
+        var rows = await _db.Database.ExecuteSqlInterpolatedAsync($@"
+            UPDATE flight
+            SET bought = bought + 1
+            WHERE flight_number = {flightNumber}
+              AND bought < capacity");
+        return rows > 0;
+    }
+
+    public async Task DecrementBoughtAsync(string flightNumber)
+    {
+        await _db.Database.ExecuteSqlInterpolatedAsync($@"
+            UPDATE flight
+            SET bought = GREATEST(bought - 1, 0)
+            WHERE flight_number = {flightNumber}");
+    }
+
     public async Task<List<Airport>> GetAirportsAsync()
         => await _db.Airports.OrderBy(a => a.Id).ToListAsync();
 

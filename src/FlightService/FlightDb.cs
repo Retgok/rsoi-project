@@ -33,7 +33,8 @@ public class FlightDb : DbContext
             entity.Property(f => f.FromAirportId).HasColumnName("from_airport_id");
             entity.Property(f => f.ToAirportId).HasColumnName("to_airport_id");
             entity.Property(f => f.Price).HasColumnName("price").IsRequired();
-            entity.Property(f => f.Capacity).HasColumnName("capacity");
+            entity.Property(f => f.Capacity).HasColumnName("capacity").IsRequired();
+            entity.Property(f => f.Bought).HasColumnName("bought").IsRequired();
 
             entity.HasOne(f => f.FromAirport)
                 .WithMany()

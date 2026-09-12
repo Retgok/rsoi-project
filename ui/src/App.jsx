@@ -218,6 +218,8 @@ function FlightsPage({ auth }) {
         })
       });
       alert('Билет успешно куплен');
+      const updated = await apiFetch('/flights?page=1&size=20', auth);
+      setFlights(updated);
     } catch (e) {
       alert(e.message);
     }
@@ -235,15 +237,21 @@ function FlightsPage({ auth }) {
         Оплатить бонусами (если доступно)
       </label>
       <div className="cards">
-        {flights.items?.map((flight) => (
-          <article key={flight.flightNumber} className="card">
-            <h3>{flight.flightNumber}</h3>
-            <p>{flight.fromAirport} → {flight.toAirport}</p>
-            <p>{flight.date}</p>
-            <p className="price">{flight.price} ₽</p>
-            <button onClick={() => buy(flight)}>Купить</button>
-          </article>
-        ))}
+        {flights.items?.map((flight) => {
+          const capacity = flight.capacity ?? 100;
+          const bought = flight.bought ?? 0;
+          const free = Math.max(0, capacity - bought);
+          return (
+            <article key={flight.flightNumber} className="card">
+              <h3>{flight.flightNumber}</h3>
+              <p>{flight.fromAirport} → {flight.toAirport}</p>
+              <p>{flight.date}</p>
+              <p className="price">{flight.price} ₽</p>
+              <p>Свободно {free}/{capacity}</p>
+              <button onClick={() => buy(flight)}>Купить</button>
+            </article>
+          );
+        })}
       </div>
     </section>
   );

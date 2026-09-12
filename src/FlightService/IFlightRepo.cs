@@ -8,4 +8,6 @@ public interface IFlightRepo
     Task<List<Airport>> GetAirportsAsync();
     Task<Airport?> GetAirportByIdAsync(int id);
     Task<Airport> AddAirportAsync(Airport airport);
+    Task<bool> TryIncrementBoughtAsync(string flightNumber);
+    Task DecrementBoughtAsync(string flightNumber);
 }

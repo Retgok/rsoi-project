@@ -125,7 +125,7 @@ public class TicketsService
         );
     }
 
-    public async Task<TicketPurchaseResponse?> PurchaseAsync(
+    public async Task<PurchaseResult> PurchaseAsync(
         string username,
         TicketPurchaseRequest dto)
     {
@@ -137,7 +137,7 @@ public class TicketsService
         );
 
         if (flight == null)
-            return null;
+            return PurchaseResult.Unavailable();
 
         var ticket = await _breaker.ExecuteAsync(
             "tickets",
@@ -147,7 +147,19 @@ public class TicketsService
         );
 
         if (ticket == null)
-            return null;
+            return PurchaseResult.Unavailable();
+
+        var incremented = await _breaker.ExecuteAsync(
+            "flights",
+            async () => await _flights.TryIncrementBoughtAsync(dto.FlightNumber),
+            fallback: () => null,
+            isCritical: true
+        );
+
+        if (incremented == null)
+            return PurchaseResult.Unavailable();
+        if (incremented == false)
+            return PurchaseResult.SoldOut();
 
         ApplyBonusResponse? bonus = null;
 
@@ -176,8 +188,8 @@ public class TicketsService
                 fallback: () => false,
                 isCritical: false
             );
-
-            return null;
+            await _flights.DecrementBoughtAsync(dto.FlightNumber);
+            return PurchaseResult.Unavailable();
         }
 
         var privilege = await _breaker.ExecuteAsync(
@@ -187,7 +199,7 @@ public class TicketsService
             isCritical: false
         );
 
-        return new TicketPurchaseResponse
+        return PurchaseResult.Ok(new TicketPurchaseResponse
         {
             TicketUid = ticket.TicketUid,
             FlightNumber = dto.FlightNumber,
@@ -205,12 +217,24 @@ public class TicketsService
                     Balance = privilege.Balance,
                     Status = privilege.Status
                 }
-        };
+        });
     }
 
 
     public async Task<bool> CancelAsync(Guid ticketUid, string username, string? authorizationHeader)
     {
+        var ticket = await _breaker.ExecuteAsync(
+            "tickets",
+            () => _tickets.GetByUidAsync(ticketUid, username),
+            fallback: () => null,
+            isCritical: true
+        );
+
+        if (ticket == null || !string.Equals(ticket.Status, "PAID", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var flightNumber = ticket.FlightNumber;
+
         var canceled = await _breaker.ExecuteAsync(
             "tickets",
             () => _tickets.CancelAsync(ticketUid, username),
@@ -220,6 +244,17 @@ public class TicketsService
 
         if (!canceled)
             return false;
+
+        await _breaker.ExecuteAsync(
+            "flights",
+            async () =>
+            {
+                await _flights.DecrementBoughtAsync(flightNumber);
+                return (bool?)true;
+            },
+            fallback: () => false,
+            isCritical: false
+        );
 
         var refundResult = await _breaker.ExecuteAsync(
             "bonus",
@@ -237,4 +272,21 @@ public class TicketsService
 
         return true;
     }
+}
+
+public sealed class PurchaseResult
+{
+    public enum Kind { Success, SoldOut, Unavailable }
+
+    public Kind Outcome { get; init; }
+    public TicketPurchaseResponse? Response { get; init; }
+
+    public static PurchaseResult Ok(TicketPurchaseResponse response)
+        => new() { Outcome = Kind.Success, Response = response };
+
+    public static PurchaseResult SoldOut()
+        => new() { Outcome = Kind.SoldOut };
+
+    public static PurchaseResult Unavailable()
+        => new() { Outcome = Kind.Unavailable };
 }

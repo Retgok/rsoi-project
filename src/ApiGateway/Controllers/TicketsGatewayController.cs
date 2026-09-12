@@ -91,7 +91,9 @@ public class TicketsGatewayController : ControllerBase
         try
         {
             var result = await _service.PurchaseAsync(username, dto);
-            if (result == null)
+            if (result.Outcome == PurchaseResult.Kind.SoldOut)
+                return Conflict(new ErrorResponse("No sits"));
+            if (result.Outcome != PurchaseResult.Kind.Success || result.Response == null)
                 return StatusCode(503, new ErrorResponse("Service unavailable"));
 
             _events.Publish(new ServiceEvent(
@@ -101,7 +103,7 @@ public class TicketsGatewayController : ControllerBase
                 dto.FlightNumber,
                 DateTime.UtcNow));
 
-            return Ok(result);
+            return Ok(result.Response);
         }
         catch
         {

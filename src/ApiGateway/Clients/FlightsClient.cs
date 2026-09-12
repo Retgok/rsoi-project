@@ -40,4 +40,19 @@ public class FlightsClient
 
     public async Task<HttpResponseMessage> CreateAirportAsync(CreateAirportRequest request)
         => await _client.PostAsJsonAsync("/api/v1/airports", request);
+
+    public async Task<bool?> TryIncrementBoughtAsync(string flightNumber)
+    {
+        var resp = await _client.PostAsync(
+            $"/api/v1/flights/{Uri.EscapeDataString(flightNumber)}/bought/increment", null);
+        if (resp.StatusCode == System.Net.HttpStatusCode.Conflict)
+            return false;
+        if (!resp.IsSuccessStatusCode)
+            return null;
+        return true;
+    }
+
+    public async Task DecrementBoughtAsync(string flightNumber)
+        => await _client.PostAsync(
+            $"/api/v1/flights/{Uri.EscapeDataString(flightNumber)}/bought/decrement", null);
 }

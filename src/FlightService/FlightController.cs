@@ -77,7 +77,8 @@ public class FlightsController : ControllerBase
             FromAirportId = request.FromAirportId,
             ToAirportId = request.ToAirportId,
             Price = request.Price,
-            Capacity = request.Capacity
+            Capacity = request.Capacity ?? 100,
+            Bought = 0
         });
 
         _events.Publish(new ServiceEvent(
@@ -88,6 +89,33 @@ public class FlightsController : ControllerBase
             DateTime.UtcNow));
 
         return Created($"/api/v1/flights/{flight.FlightNumber}", new FlightResponse(flight));
+    }
+
+    [HttpPost("{flightNumber}/bought/increment")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> IncrementBought([FromRoute] string flightNumber)
+    {
+        if (await _repo.GetByFlightNumberAsync(flightNumber) == null)
+            return NotFound(new ErrorResponse($"Flight {flightNumber} not found"));
+
+        if (!await _repo.TryIncrementBoughtAsync(flightNumber))
+            return Conflict(new ErrorResponse("No sits"));
+
+        return NoContent();
+    }
+
+    [HttpPost("{flightNumber}/bought/decrement")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DecrementBought([FromRoute] string flightNumber)
+    {
+        if (await _repo.GetByFlightNumberAsync(flightNumber) == null)
+            return NotFound(new ErrorResponse($"Flight {flightNumber} not found"));
+
+        await _repo.DecrementBoughtAsync(flightNumber);
+        return NoContent();
     }
 }
 

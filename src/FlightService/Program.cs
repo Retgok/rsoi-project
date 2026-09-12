@@ -38,12 +38,17 @@ using (var scope = app.Services.CreateScope())
     try
     {
         var db = scope.ServiceProvider.GetRequiredService<FlightDb>();
-        await db.Database.ExecuteSqlRawAsync("ALTER TABLE flight ADD COLUMN IF NOT EXISTS capacity INT;");
+        await db.Database.ExecuteSqlRawAsync("""
+            ALTER TABLE flight ADD COLUMN IF NOT EXISTS capacity INT NOT NULL DEFAULT 100;
+            ALTER TABLE flight ADD COLUMN IF NOT EXISTS bought INT NOT NULL DEFAULT 0;
+            UPDATE flight SET capacity = 100 WHERE capacity IS NULL OR capacity <= 0;
+            UPDATE flight SET bought = 0 WHERE bought IS NULL OR bought < 0;
+            """);
     }
     catch (Exception ex)
     {
         var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("FlightMigration");
-        logger.LogWarning(ex, "Could not migrate flight.capacity automatically");
+        logger.LogWarning(ex, "Could not migrate flight.capacity/bought automatically");
     }
 }
 

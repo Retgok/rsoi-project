@@ -8,7 +8,8 @@ public class Flight
     public int FromAirportId { get; set; }
     public int ToAirportId { get; set; }
     public int Price { get; set; }
-    public int? Capacity { get; set; }
+    public int Capacity { get; set; } = 100;
+    public int Bought { get; set; }
 
     public Airport? FromAirport { get; set; }
     public Airport? ToAirport { get; set; }

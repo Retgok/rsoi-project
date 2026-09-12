@@ -12,7 +12,8 @@ public class FlightResponse
     [JsonPropertyName("date")]
     public DateTime Date { get; set; }
     public int Price { get; set; }
-    public int? Capacity { get; set; }
+    public int Capacity { get; set; }
+    public int Bought { get; set; }
 }
 
 public class AirportResponse
